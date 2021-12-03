@@ -12,7 +12,7 @@ OUTPUT_HIGH = 1
 OUTPUT_LOW = 0
 ON = 1
 OFF = 0
-PORT = "/dev/ttyACM4"
+PORT = "/dev/ttyACM11"
 BaudRate = 115200
 cnt_switch = 0
 parsingData = ""
@@ -23,67 +23,81 @@ GPIO.pinMode(GLED_PIN, OUTPUT)
 GPIO.pinMode(BLED_PIN,OUTPUT)
 
 def sendData(receiveData):
+    try:
+        global receive
+        # ID 설정
+        ID = b'\x10\x01\x0D\x0A'
+        ser.write(ID)
+        # 약한 파란신호
+        # print(receiveData)
+        # turnWeakBlue = b'\x20\x02\x0F\x1F\xAA\xBB\xCC\xDD\xEE\xFF\x0D\x0A'
 
-# def sendData():
-    global turnStrongBlue
-    # ID 설정
-    ID = b'\x10\x01\x0D\x0A'
-    ser.write(ID)
-    # 약한 파란신호
-    # turnWeakBlue = b'\x20\x02\x0F\xAA\xBB\xCC\xDD\xEE\xFF\x0D\x0A'
-    # turnWeakBlue = b'\x30\x02\x0F 1F AA BB CC DD EE FF 0D 0A'
-    # print(turnWeakBlue)
-    # ser.write(turnWeakBlue) 
-    # # 쎈 파란신호
-    turnWeakBlue = b'\x20\x02\x0F '
-    # turnStrongBlue = b'\x30\x02\x0F '
-    # # print(turnStrongBlue)
-    # # print('bytearray(hex(parsingData)) = ', bytearray(hex(parsingData)))
-    # # turnStrongBlue += bytearray(hex(parsingData))
-    # # turnStrongBlue += parsingData
-    turnWeakBlue += receiveData
-    turnWeakBlue += b'\x0D\x0A'
-    print('turnWeakBlue',turnWeakBlue)
-    # ser.write(turnStrongBlue)
-    # ser.write(bytearray(turnStrongBlue))
-
-    cnt = 86 # uart 버퍼가 버티는 최대 범위
-    while(cnt):
-        ser.write(turnWeakBlue)
-        time.sleep(0.006) # 최대 속도 
-        cnt -= 1
-        # print(cnt)
-    onSendLED()
+        # turnWeakBlue = b'\x20\x02 0F 1F AA BB CC DD EE FF 0D 0A'
+        # turnWeakBlue = b'\x30\x02\x0F 1F AA BB CC DD EE FF 0D 0A'
+        # print(turnWeakBlue)
+        # ser.write(turnWeakBlue) 
+        # # 쎈 파란신호
+        turnWeakBlue = b'\x20\x02\x0F'
+        print("receive",receiveData)
+        turnWeakBlue += receiveData
+        turnWeakBlue += b'\x0D\x0A'
+        print('turnWeakBlue',turnWeakBlue)
+        # ser.write(turnStrongBlue)
+        # ser.write(bytearray(turnStrongBlue))
+        # while
+        cnt = 80 # uart 버퍼가 버티는 최대 범위
+        while(cnt):
+            ser.write(turnWeakBlue)
+            time.sleep(0.05) # 최대 속도 
+            cnt -= 1
+            print(cnt)
+        
+        onSendLED()
+        receive = True
+    except Exception as e:
+        print(e)
 
 def receiveData():
     global parsingData
+    global receive
     receive = True
     realData =''
     while(receive):
         if ser.readable(): # 값이 들어왔는지 체크
             Data = ser.readline()
             # print(Data)
-            if Data.startswith(b'Rx >>>'): # UART 개방시 빈 문자열이 계속해서 들어옴
-            # 데이터 파싱
-                print("DATA=",Data)
-                parsingData = Data[14:17]
-                parsingData += Data[26:-9]
-                # hexData = parsingData.split()
-                # print(hexData)
-                receive = False
-                time.sleep(10) # 수신받은 보내기 전 10초 대기
-                sendData(parsingData)
-        # onSendLED() 
+            try:
+                if Data.startswith(b'Rx >>>'): # UART 개방시 빈 문자열이 계속해서 들어옴
+                # 데이터 파싱
+                    onReceivedLED()
+                    print("DATA=",Data)
+                    parsingData = Data[14:17]
+                    parsingData += Data[26:-9]
+                    print("parsingData",parsingData)
+                    result = parsingData.decode('utf-8')
+                    print("result",result)
+                    dataTohex = bytes.fromhex(result)
+                    print("dataTohex ",dataTohex)
+                    receive = False
+                    time.sleep(10) # 수신받은 보내기 전 10초 대기
+                    sendData(dataTohex)
+            except Exception as e:
+                print(e)
 
-def onSendLED():
-#     global cnt_switch
+def onReceivedLED():
     a=10
     while(a):
         GPIO.digitalWrite(BLED_PIN,ON)
-        GPIO.delay(1000)
+        GPIO.delay(100)
         GPIO.digitalWrite(BLED_PIN,OFF)
-        GPIO.delay(1000)
+        GPIO.delay(100)
         a -= 1
+        
+def onSendLED():
+    GPIO.digitalWrite(BLED_PIN,ON)
+    GPIO.delay(10000)
+    GPIO.digitalWrite(BLED_PIN,OFF)
+    # GPIO.delay(500)
         
 
 # def checkSwitch():
@@ -102,29 +116,8 @@ def onSendLED():
 #             # pass
 
     
-# def offLED():
-#     GPIO.digitalWrite(LED_PIN,0)
 
-# def switch():
-#     if GPIO.digitalRead(SWITCH_PIN):
-#         print("스위치 연결")
-#         onSendLED()
-#     else:
-#         print("스위치 닫힘")
-#         offLED()
-    
-# # def offSendLED():
-# # def onReceiveLED():
-# # def offReceiveLED():
-# tOnSendLed = threading.Thread(target = onSendLED)
-# tCheckSwitch = threading.Thread(target = checkSwitch)
-# tOnSendLed.start()
-# tCheckSwitch.start()
-
-# checkSwitch()
-# receiveData()
-# ser.close()
 if __name__=='__main__':
-    receiveData()
-    # sendData()
-    # onSendLED()
+    GPIO.digitalWrite(BLED_PIN,OFF)
+    while True:
+        receiveData()
