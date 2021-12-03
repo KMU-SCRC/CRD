@@ -1,18 +1,15 @@
-from os import readlink
 import serial
 import time
-import threading
 import wiringpi as GPIO
 INPUT = 0
 OUTPUT = 1
 BLED_PIN = 16 # 37
 GLED_PIN = 17 # 33
-# SWITCH_PIN = 5# 39
 OUTPUT_HIGH = 1
 OUTPUT_LOW = 0
 ON = 1
 OFF = 0
-PORT = "/dev/ttyACM11"
+PORT = "/dev/ttyACM4"
 BaudRate = 115200
 cnt_switch = 0
 parsingData = ""
@@ -25,30 +22,17 @@ GPIO.pinMode(BLED_PIN,OUTPUT)
 def sendData(receiveData):
     try:
         global receive
-        # ID 설정
-        ID = b'\x10\x01\x0D\x0A'
+        ID = b'\x10\x01\x0D\x0A' # ID 설정
         ser.write(ID)
-        # 약한 파란신호
-        # print(receiveData)
-        # turnWeakBlue = b'\x20\x02\x0F\x1F\xAA\xBB\xCC\xDD\xEE\xFF\x0D\x0A'
-
-        # turnWeakBlue = b'\x20\x02 0F 1F AA BB CC DD EE FF 0D 0A'
-        # turnWeakBlue = b'\x30\x02\x0F 1F AA BB CC DD EE FF 0D 0A'
-        # print(turnWeakBlue)
-        # ser.write(turnWeakBlue) 
-        # # 쎈 파란신호
-        turnWeakBlue = b'\x20\x02\x0F'
-        print("receive",receiveData)
+        turnWeakBlue = b'\x20\x02\x0F' # 프로토콜 규칙
         turnWeakBlue += receiveData
         turnWeakBlue += b'\x0D\x0A'
         print('turnWeakBlue',turnWeakBlue)
-        # ser.write(turnStrongBlue)
-        # ser.write(bytearray(turnStrongBlue))
-        # while
-        cnt = 80 # uart 버퍼가 버티는 최대 범위
+
+        cnt = 80 # uart 버퍼가 버티는 빛 보내는 횟수
         while(cnt):
             ser.write(turnWeakBlue)
-            time.sleep(0.05) # 최대 속도 
+            time.sleep(0.05) # 한번 보내고 대기하는 시간, 단위 (초)
             cnt -= 1
             print(cnt)
         
@@ -57,24 +41,25 @@ def sendData(receiveData):
     except Exception as e:
         print(e)
 
-def receiveData():
+def receivedData():
     global parsingData
     global receive
-    receive = True
-    realData =''
+    receive = True # 빛을 여러 번 쏘니까 한번만 수신 받기 위함
+    
     while(receive):
         if ser.readable(): # 값이 들어왔는지 체크
             Data = ser.readline()
             # print(Data)
             try:
-                if Data.startswith(b'Rx >>>'): # UART 개방시 빈 문자열이 계속해서 들어옴
+                if Data.startswith(b'Rx >>>'): # UART 개방시 빈 문자열이 들어옴
+                # “Rx >>>” 로 시작하는 데이터만 파싱
                 # 데이터 파싱
                     onReceivedLED()
                     print("DATA=",Data)
                     parsingData = Data[14:17]
                     parsingData += Data[26:-9]
                     print("parsingData",parsingData)
-                    result = parsingData.decode('utf-8')
+                    result = parsingData.decode('utf-8') # byte를 str으로 변경하기 위해
                     print("result",result)
                     dataTohex = bytes.fromhex(result)
                     print("dataTohex ",dataTohex)
@@ -87,37 +72,25 @@ def receiveData():
 def onReceivedLED():
     a=10
     while(a):
-        GPIO.digitalWrite(BLED_PIN,ON)
-        GPIO.delay(100)
-        GPIO.digitalWrite(BLED_PIN,OFF)
+        GPIO.digitalWrite(BLED_PIN,ON) # LED 켜기
+        GPIO.delay(100) # 단위 (ms)
+        GPIO.digitalWrite(BLED_PIN,OFF) # LED 끄가
         GPIO.delay(100)
         a -= 1
-        
+
 def onSendLED():
-    GPIO.digitalWrite(BLED_PIN,ON)
-    GPIO.delay(10000)
-    GPIO.digitalWrite(BLED_PIN,OFF)
-    # GPIO.delay(500)
+    a=10
+    while(a):
+        GPIO.digitalWrite(BLED_PIN,ON)
+        GPIO.delay(1000)
+        GPIO.digitalWrite(BLED_PIN,OFF)
+        GPIO.delay(1000)
+        a -= 1
         
-
-# def checkSwitch():
-#     # global cnt_switch
-#     # print(cnt_switch)
-#     while(True):
-#         print(GPIO.digitalRead(SWITCH_PIN))
-#         if GPIO.digitalRead(SWITCH_PIN):
-#         #      # 눌렸을 때 1
-#         #     # cnt_switch += 1
-#         #     # print("눌림",cnt_switch)
-#             GPIO.digitalWrite(LED_PIN,ON)
-#         else:
-#         #     # print("안눌림",cnt_switch)
-#             GPIO.digitalWrite(LED_PIN,OFF)
-#             # pass
-
-    
-
 if __name__=='__main__':
     GPIO.digitalWrite(BLED_PIN,OFF)
     while True:
-        receiveData()
+        try:
+            receivedData()
+        except Exception as e:
+            print(e)
